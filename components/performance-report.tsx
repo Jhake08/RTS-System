@@ -1,43 +1,20 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useMemo } from "react"
 import { TrendingUp, Package, CheckCircle, XCircle } from "lucide-react"
 import type { ProcessedData } from "@/lib/types"
-import { ReportFiltersComponent, type ReportFilters } from "./report-filters"
 
 interface PerformanceReportProps {
   data: ProcessedData | null
 }
 
 export function PerformanceReport({ data }: PerformanceReportProps) {
-  const [filters, setFilters] = useState<ReportFilters>({
-    island: "all",
-    status: "all",
-    dateFrom: "",
-    dateTo: "",
-  })
-
   const filteredData = useMemo(() => {
     if (!data) return null
 
-    const sourceData = filters.island === "all" ? data.all : data[filters.island]
+    const sourceData = data.all
 
-    const filtered = sourceData.data.filter((parcel) => {
-      // Status filter
-      if (filters.status !== "all" && parcel.normalizedStatus !== filters.status) {
-        return false
-      }
-
-      // Date filters
-      if (filters.dateFrom && parcel.date < filters.dateFrom) {
-        return false
-      }
-      if (filters.dateTo && parcel.date > filters.dateTo) {
-        return false
-      }
-
-      return true
-    })
+    const filtered = sourceData.data
 
     // Recalculate stats for filtered data
     const stats: { [status: string]: { count: number } } = {}
@@ -53,7 +30,7 @@ export function PerformanceReport({ data }: PerformanceReportProps) {
       stats,
       total: filtered.length,
     }
-  }, [data, filters])
+  }, [data])
 
   if (!data) {
     return (
@@ -66,8 +43,6 @@ export function PerformanceReport({ data }: PerformanceReportProps) {
       </div>
     )
   }
-
-  const availableStatuses = Object.keys(data.all.stats)
 
   const deliveryRate = filteredData
     ? (((filteredData.stats.DELIVERED?.count || 0) / filteredData.total) * 100).toFixed(2)
@@ -88,8 +63,6 @@ export function PerformanceReport({ data }: PerformanceReportProps) {
         <h1 className="text-3xl font-bold text-foreground mb-2">PERFORMANCE REPORT</h1>
         <p className="text-muted-foreground">Comprehensive delivery and operational performance metrics</p>
       </div>
-
-      <ReportFiltersComponent filters={filters} onFiltersChange={setFilters} availableStatuses={availableStatuses} />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="glass rounded-xl p-6 border border-border/50">

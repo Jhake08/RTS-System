@@ -1,39 +1,20 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useMemo } from "react"
 import { DollarSign, AlertCircle, TrendingUp, TrendingDown } from "lucide-react"
 import type { ProcessedData } from "@/lib/types"
-import { ReportFiltersComponent, type ReportFilters } from "./report-filters"
 
 interface FinancialReportProps {
   data: ProcessedData | null
 }
 
 export function FinancialReport({ data }: FinancialReportProps) {
-  const [filters, setFilters] = useState<ReportFilters>({
-    island: "all",
-    status: "all",
-    dateFrom: "",
-    dateTo: "",
-  })
-
   const financialData = useMemo(() => {
     if (!data) return null
 
-    const sourceData = filters.island === "all" ? data.all : data[filters.island]
+    const sourceData = data.all
 
-    const filtered = sourceData.data.filter((parcel) => {
-      if (filters.status !== "all" && parcel.normalizedStatus !== filters.status) {
-        return false
-      }
-      if (filters.dateFrom && parcel.date < filters.dateFrom) {
-        return false
-      }
-      if (filters.dateTo && parcel.date > filters.dateTo) {
-        return false
-      }
-      return true
-    })
+    const filtered = sourceData.data
 
     // Calculate financial metrics
     const totalCOD = filtered.reduce((sum, parcel) => sum + (parcel.codAmount || 0), 0)
@@ -61,7 +42,7 @@ export function FinancialReport({ data }: FinancialReportProps) {
       grossProfit,
       netProfit,
     }
-  }, [data, filters])
+  }, [data])
 
   if (!data) {
     return (
@@ -75,16 +56,12 @@ export function FinancialReport({ data }: FinancialReportProps) {
     )
   }
 
-  const availableStatuses = Object.keys(data.all.stats)
-
   return (
     <div className="p-8 space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-foreground mb-2">FINANCIAL IMPACT REPORT</h1>
         <p className="text-muted-foreground">Comprehensive financial analysis and RTS cost impact</p>
       </div>
-
-      <ReportFiltersComponent filters={filters} onFiltersChange={setFilters} availableStatuses={availableStatuses} />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="glass rounded-xl p-6 border border-border/50">
