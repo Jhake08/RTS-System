@@ -1,10 +1,11 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { TrendingUp, Package, CheckCircle, XCircle, DollarSign, AlertCircle, TrendingDown } from "lucide-react"
+import { TrendingUp, Package, CheckCircle, XCircle, PieChart, BarChart3 } from "lucide-react"
 import type { ProcessedData, FilterState } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { PieChart as RechartsPieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 
 interface PerformanceReportProps {
   data: ProcessedData | null
@@ -14,97 +15,66 @@ export function PerformanceReport({ data }: PerformanceReportProps) {
   const [currentRegion, setCurrentRegion] = useState<"all" | "luzon" | "visayas" | "mindanao">("all")
   const [filter, setFilter] = useState<FilterState>({ type: "all", value: "" })
 
-  const filteredData = useMemo(() => {
-    if (!data) return null
+  const { filteredData, regionalRates, pieData } = useMemo(() => {
+    if (!data) return { filteredData: null, regionalRates: [], pieData: [] }
 
     const sourceData = currentRegion === "all" ? data.all : data[currentRegion]
 
+    let filtered: any[]
     if (filter.type === "all") {
-      const filtered = sourceData.data
-
-      // Recalculate stats for filtered data
-      const stats: { [status: string]: { count: number } } = {}
-      filtered.forEach((parcel) => {
-        if (!stats[parcel.normalizedStatus]) {
-          stats[parcel.normalizedStatus] = { count: 0 }
+      filtered = sourceData.data
+    } else {
+      filtered = sourceData.data.filter((parcel) => {
+        if (filter.type === "province") {
+          return parcel.province.toLowerCase().includes(filter.value.toLowerCase())
         }
-        stats[parcel.normalizedStatus].count++
-      })
-
-      // Calculate financial metrics
-      const totalCOD = filtered.reduce((sum, parcel) => sum + (parcel.codAmount || 0), 0)
-      const totalShippingCost = filtered.reduce((sum, parcel) => sum + (parcel.totalCost || 0), 0)
-      const rtsStatuses = ["CANCELLED", "PROBLEMATIC", "RETURNED"]
-      const rtsParcels = filtered.filter((p) => rtsStatuses.includes(p.normalizedStatus))
-      const rtsShippingCost = rtsParcels.reduce((sum, parcel) => sum + (parcel.totalCost || 0), 0)
-      const rtsFeeLost = rtsParcels.reduce((sum, parcel) => sum + (parcel.rtsFee || 0), 0)
-      const grossProfit = totalCOD - totalShippingCost
-      const netProfit = grossProfit - rtsShippingCost - rtsFeeLost
-
-      return {
-        data: filtered,
-        stats,
-        total: filtered.length,
-        totalCOD,
-        totalShippingCost,
-        rtsShippingCost,
-        grossProfit,
-        netProfit,
-        rtsParcelsCount: rtsParcels.length,
-        rtsFeeLost,
-      }
-    }
-
-    const filtered = sourceData.data.filter((parcel) => {
-      if (filter.type === "province") {
-        return parcel.province.toLowerCase().includes(filter.value.toLowerCase())
-      }
-      if (filter.type === "month") {
-        if (!parcel.date) return false
-        let parcelMonth: number
-        try {
-          let d: Date
-          if (typeof parcel.date === "number") {
-            d = new Date(Date.UTC(1899, 11, 30) + parcel.date * 86400000)
-          } else {
-            d = new Date(parcel.date.toString().trim())
-          }
-          if (isNaN(d.getTime())) {
+        if (filter.type === "month") {
+          if (!parcel.date) return false
+          let parcelMonth: number
+          try {
+            let d: Date
+            if (typeof parcel.date === "number") {
+              d = new Date(Date.UTC(1899, 11, 30) + parcel.date * 86400000)
+            } else {
+              d = new Date(parcel.date.toString().trim())
+            }
+            if (isNaN(d.getTime())) {
+              const parts = parcel.date.toString().split(" ")[0].split("-")
+              parcelMonth = Number.parseInt(parts[1], 10)
+            } else {
+              parcelMonth = d.getMonth() + 1
+            }
+          } catch (e) {
             const parts = parcel.date.toString().split(" ")[0].split("-")
             parcelMonth = Number.parseInt(parts[1], 10)
-          } else {
-            parcelMonth = d.getMonth() + 1
           }
-        } catch (e) {
-          const parts = parcel.date.toString().split(" ")[0].split("-")
-          parcelMonth = Number.parseInt(parts[1], 10)
+          return parcelMonth === Number.parseInt(filter.value, 10)
         }
-        return parcelMonth === Number.parseInt(filter.value, 10)
-      }
-      if (filter.type === "year") {
-        if (!parcel.date) return false
-        let parcelYear: number
-        try {
-          let d: Date
-          if (typeof parcel.date === "number") {
-            d = new Date(Date.UTC(1899, 11, 30) + parcel.date * 86400000)
-          } else {
-            d = new Date(parcel.date.toString().trim())
-          }
-          if (isNaN(d.getTime())) {
+        if (filter.type === "year") {
+          if (!parcel.date) return false
+          let parcelYear: number
+          try {
+            let d: Date
+            if (typeof parcel.date === "number") {
+              d = new Date(Date.UTC(1899, 11, 30) + parcel.date * 86400000)
+            } else {
+              d = new Date(parcel.date.toString().trim())
+            }
+            if (isNaN(d.getTime())) {
+              const parts = parcel.date.toString().split(" ")[0].split("-")
+              parcelYear = Number.parseInt(parts[0], 10)
+            } else {
+              parcelYear = d.getFullYear()
+            }
+          } catch (e) {
             const parts = parcel.date.toString().split(" ")[0].split("-")
             parcelYear = Number.parseInt(parts[0], 10)
-          } else {
-            parcelYear = d.getFullYear()
           }
-        } catch (e) {
-          const parts = parcel.date.toString().split(" ")[0].split("-")
-          parcelYear = Number.parseInt(parts[0], 10)
+          return parcelYear === Number.parseInt(filter.value, 10)
         }
-        return parcelYear === Number.parseInt(filter.value, 10)
-      }
-      return true
-    })
+        return true
+      })
+    }
 
     // Recalculate stats for filtered data
     const stats: { [status: string]: { count: number } } = {}
@@ -115,27 +85,37 @@ export function PerformanceReport({ data }: PerformanceReportProps) {
       stats[parcel.normalizedStatus].count++
     })
 
-    // Calculate financial metrics
-    const totalCOD = filtered.reduce((sum, parcel) => sum + (parcel.codAmount || 0), 0)
-    const totalShippingCost = filtered.reduce((sum, parcel) => sum + (parcel.totalCost || 0), 0)
-    const rtsStatuses = ["CANCELLED", "PROBLEMATIC", "RETURNED"]
-    const rtsParcels = filtered.filter((p) => rtsStatuses.includes(p.normalizedStatus))
-    const rtsShippingCost = rtsParcels.reduce((sum, parcel) => sum + (parcel.totalCost || 0), 0)
-    const rtsFeeLost = rtsParcels.reduce((sum, parcel) => sum + (parcel.rtsFee || 0), 0)
-    const grossProfit = totalCOD - totalShippingCost
-    const netProfit = grossProfit - rtsShippingCost - rtsFeeLost
+    // Calculate regional delivery rates
+    const regionalRates = [
+      {
+        region: "Luzon",
+        rate: data.luzon.total > 0 ? ((data.luzon.stats.DELIVERED?.count || 0) / data.luzon.total) * 100 : 0,
+      },
+      {
+        region: "Visayas",
+        rate: data.visayas.total > 0 ? ((data.visayas.stats.DELIVERED?.count || 0) / data.visayas.total) * 100 : 0,
+      },
+      {
+        region: "Mindanao",
+        rate: data.mindanao.total > 0 ? ((data.mindanao.stats.DELIVERED?.count || 0) / data.mindanao.total) * 100 : 0,
+      },
+    ]
+
+    // Prepare pie chart data
+    const pieData = Object.entries(stats).map(([status, data]) => ({
+      name: status,
+      value: data.count,
+      percentage: ((data.count / filtered.length) * 100).toFixed(1),
+    }))
 
     return {
-      data: filtered,
-      stats,
-      total: filtered.length,
-      totalCOD,
-      totalShippingCost,
-      rtsShippingCost,
-      grossProfit,
-      netProfit,
-      rtsParcelsCount: rtsParcels.length,
-      rtsFeeLost,
+      filteredData: {
+        data: filtered,
+        stats,
+        total: filtered.length,
+      },
+      regionalRates,
+      pieData,
     }
   }, [data, currentRegion, filter])
 
@@ -163,6 +143,7 @@ export function PerformanceReport({ data }: PerformanceReportProps) {
         100
       ).toFixed(2)
     : "0.00"
+
 
   return (
     <div className="p-8 space-y-6">
@@ -275,125 +256,44 @@ export function PerformanceReport({ data }: PerformanceReportProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="glass rounded-xl p-6 border border-border/50">
-          <div className="flex items-center justify-between mb-4">
-            <DollarSign className="w-8 h-8 text-green-500" />
-          </div>
-          <p className="text-sm text-muted-foreground mb-1">Total Parcels</p>
-          <p className="text-3xl font-bold text-foreground">{filteredData?.total.toLocaleString() || 0}</p>
-        </div>
-
-        <div className="glass rounded-xl p-6 border border-border/50">
-          <div className="flex items-center justify-between mb-4">
-            <DollarSign className="w-8 h-8 text-blue-500" />
-          </div>
-          <p className="text-sm text-muted-foreground mb-1">Total COD Amount</p>
-          <p className="text-3xl font-bold text-foreground">
-            ₱
-            {filteredData?.totalCOD.toLocaleString(undefined, {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            }) || "0.00"}
-          </p>
-        </div>
-
-        <div className="glass rounded-xl p-6 border border-border/50">
-          <div className="flex items-center justify-between mb-4">
-            <DollarSign className="w-8 h-8 text-primary" />
-          </div>
-          <p className="text-sm text-muted-foreground mb-1">Total Operational Cost</p>
-          <p className="text-3xl font-bold text-foreground">
-            ₱
-            {filteredData?.totalShippingCost.toLocaleString(undefined, {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            }) || "0.00"}
-          </p>
-        </div>
-
-        <div className="glass rounded-xl p-6 border border-border/50">
-          <div className="flex items-center justify-between mb-4">
-            <DollarSign className="w-8 h-8 text-orange-500" />
-          </div>
-          <p className="text-sm text-muted-foreground mb-1">RTS Cost Impact</p>
-          <p className="text-3xl font-bold text-foreground">
-            -₱
-            {filteredData?.rtsShippingCost.toLocaleString(undefined, {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            }) || "0.00"}
-          </p>
-        </div>
+      {/* Pie Chart for Status Distribution */}
+      <div className="glass rounded-xl p-6 border border-border/50">
+        <h2 className="text-xl font-bold text-foreground mb-4 flex items-center gap-2">
+          <PieChart className="w-6 h-6" />
+          Status Distribution
+        </h2>
+        <ResponsiveContainer width="100%" height={250}>
+          <RechartsPieChart>
+            <Pie data={pieData} dataKey="value" nameKey="name" outerRadius={80} fill="#8884d8" label>
+              {pieData.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+              ))}
+            </Pie>
+            <Tooltip />
+          </RechartsPieChart>
+        </ResponsiveContainer>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="glass rounded-xl p-6 border border-green-500/50">
-          <div className="flex items-center gap-3 mb-4">
-            <TrendingUp className="w-6 h-6 text-green-500" />
-            <h2 className="text-xl font-bold text-foreground">Gross Profit</h2>
-          </div>
-          <p className="text-4xl font-bold text-green-500 mb-2">
-            ₱
-            {filteredData?.grossProfit.toLocaleString(undefined, {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            }) || "0.00"}
-          </p>
-          <p className="text-sm text-muted-foreground">Total COD - Shipping Costs</p>
-        </div>
-
-        <div className="glass rounded-xl p-6 border border-blue-500/50">
-          <div className="flex items-center gap-3 mb-4">
-            <TrendingDown className="w-6 h-6 text-blue-500" />
-            <h2 className="text-xl font-bold text-foreground">Net Profit</h2>
-          </div>
-          <p className="text-4xl font-bold text-blue-500 mb-2">
-            ₱
-            {filteredData?.netProfit.toLocaleString(undefined, {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            }) || "0.00"}
-          </p>
-          <p className="text-sm text-muted-foreground">Gross Profit - RTS Impact</p>
-        </div>
-      </div>
-
-      <div className="glass rounded-xl p-6 border border-red-500/50">
-        <div className="flex items-center gap-3 mb-6">
-          <AlertCircle className="w-6 h-6 text-red-500" />
-          <h2 className="text-xl font-bold text-foreground">RTS Financial Impact</h2>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="p-4 rounded-lg bg-red-500/10">
-            <p className="text-sm text-muted-foreground mb-1">RTS Parcels</p>
-            <p className="text-2xl font-bold text-foreground">{filteredData?.rtsParcelsCount.toLocaleString() || 0}</p>
-          </div>
-
-          <div className="p-4 rounded-lg bg-red-500/10">
-            <p className="text-sm text-muted-foreground mb-1">RTS Shipping Cost Lost</p>
-            <p className="text-2xl font-bold text-red-500">
-              ₱
-              {filteredData?.rtsShippingCost.toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              }) || "0.00"}
-            </p>
-          </div>
-
-          <div className="p-4 rounded-lg bg-red-500/10">
-            <p className="text-sm text-muted-foreground mb-1">RTS Fee Impact</p>
-            <p className="text-2xl font-bold text-red-500">
-              ₱
-              {filteredData?.rtsFeeLost.toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              }) || "0.00"}
-            </p>
-          </div>
-        </div>
+      {/* Regional Delivery Rates Bar Chart */}
+      <div className="glass rounded-xl p-6 border border-border/50">
+        <h2 className="text-xl font-bold text-foreground mb-4 flex items-center gap-2">
+          <BarChart3 className="w-6 h-6" />
+          Regional Delivery Rates (%)
+        </h2>
+        <ResponsiveContainer width="100%" height={250}>
+          <BarChart data={regionalRates} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="region" />
+            <YAxis />
+            <Tooltip />
+            <Legend />
+            <Bar dataKey="rate" fill="#82ca9d" />
+          </BarChart>
+        </ResponsiveContainer>
       </div>
     </div>
   )
 }
+
+const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884D8", "#82CA9D"]
+
