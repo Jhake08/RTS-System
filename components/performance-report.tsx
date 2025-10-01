@@ -5,7 +5,7 @@ import { TrendingUp, Package, CheckCircle, XCircle, PieChart, BarChart3 } from "
 import type { ProcessedData, FilterState } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { PieChart as RechartsPieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
+import { PieChart as RechartsPieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from "recharts"
 
 interface PerformanceReportProps {
   data: ProcessedData | null
@@ -15,8 +15,8 @@ export function PerformanceReport({ data }: PerformanceReportProps) {
   const [currentRegion, setCurrentRegion] = useState<"all" | "luzon" | "visayas" | "mindanao">("all")
   const [filter, setFilter] = useState<FilterState>({ type: "all", value: "" })
 
-  const { filteredData, regionalRates, pieData } = useMemo(() => {
-    if (!data) return { filteredData: null, regionalRates: [], pieData: [] }
+  const { filteredData, regionalRates, pieData, lineData } = useMemo(() => {
+    if (!data) return { filteredData: null, regionalRates: [], pieData: [], lineData: [] }
 
     const sourceData = currentRegion === "all" ? data.all : data[currentRegion]
 
@@ -108,6 +108,60 @@ export function PerformanceReport({ data }: PerformanceReportProps) {
       percentage: ((data.count / filtered.length) * 100).toFixed(1),
     }))
 
+    // Prepare line chart data for delivery and RTS rates over months
+    const monthMap: { [key: number]: string } = {
+      1: "Jan",
+      2: "Feb",
+      3: "Mar",
+      4: "Apr",
+      5: "May",
+      6: "Jun",
+      7: "Jul",
+      8: "Aug",
+      9: "Sep",
+      10: "Oct",
+      11: "Nov",
+      12: "Dec",
+    }
+
+    const monthlyStats: { [month: number]: { delivered: number; rts: number; total: number } } = {}
+
+    filtered.forEach((parcel) => {
+      if (!parcel.date) return
+      let d: Date
+      try {
+        if (typeof parcel.date === "number") {
+          d = new Date(Date.UTC(1899, 11, 30) + parcel.date * 86400000)
+        } else {
+          d = new Date(parcel.date.toString().trim())
+        }
+      } catch {
+        return
+      }
+      const month = d.getMonth() + 1
+      if (!monthlyStats[month]) {
+        monthlyStats[month] = { delivered: 0, rts: 0, total: 0 }
+      }
+      monthlyStats[month].total++
+      if (parcel.normalizedStatus === "DELIVERED") {
+        monthlyStats[month].delivered++
+      }
+      if (["CANCELLED", "PROBLEMATIC", "RETURNED"].includes(parcel.normalizedStatus)) {
+        monthlyStats[month].rts++
+      }
+    })
+
+    const lineData = Object.entries(monthlyStats)
+      .map(([monthStr, stats]) => {
+        const month = Number(monthStr)
+        return {
+          month: monthMap[month],
+          deliveredRate: stats.total > 0 ? (stats.delivered / stats.total) * 100 : 0,
+          rtsRate: stats.total > 0 ? (stats.rts / stats.total) * 100 : 0,
+        }
+      })
+      .sort((a, b) => Object.keys(monthMap).indexOf(a.month) - Object.keys(monthMap).indexOf(b.month))
+
     return {
       filteredData: {
         data: filtered,
@@ -116,6 +170,7 @@ export function PerformanceReport({ data }: PerformanceReportProps) {
       },
       regionalRates,
       pieData,
+      lineData,
     }
   }, [data, currentRegion, filter])
 
@@ -143,7 +198,6 @@ export function PerformanceReport({ data }: PerformanceReportProps) {
         100
       ).toFixed(2)
     : "0.00"
-
 
   return (
     <div className="p-8 space-y-6">
@@ -289,6 +343,25 @@ export function PerformanceReport({ data }: PerformanceReportProps) {
             <Legend />
             <Bar dataKey="rate" fill="#82ca9d" />
           </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Line Chart for Monthly Delivery and RTS Rates */}
+      <div className="glass rounded-xl p-6 border border-border/50">
+        <h2 className="text-xl font-bold text-foreground mb-4 flex items-center gap-2">
+          <TrendingUp className="w-6 h-6" />
+          Monthly Delivery & RTS Rates (%)
+        </h2>
+        <ResponsiveContainer width="100%" height={250}>
+          <LineChart data={lineData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="month" />
+            <YAxis />
+            <Tooltip />
+            <Legend />
+            <Line type="monotone" dataKey="deliveredRate" stroke="#00C49F" activeDot={{ r: 8 }} />
+            <Line type="monotone" dataKey="rtsRate" stroke="#FF8042" />
+          </LineChart>
         </ResponsiveContainer>
       </div>
     </div>
