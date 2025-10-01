@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { DollarSign, AlertCircle, TrendingUp, TrendingDown } from "lucide-react"
-import type { ProcessedData } from "@/lib/types"
+import type { ProcessedData, FilterState } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
@@ -11,15 +11,15 @@ interface FinancialReportProps {
 }
 
 export function FinancialReport({ data }: FinancialReportProps) {
-  const [filterType, setFilterType] = useState<"all" | "province" | "month" | "year">("all")
-  const [filterValue, setFilterValue] = useState("")
+  const [currentRegion, setCurrentRegion] = useState<"all" | "luzon" | "visayas" | "mindanao">("all")
+  const [filter, setFilter] = useState<FilterState>({ type: "all", value: "" })
 
   const financialData = useMemo(() => {
     if (!data) return null
 
-    const sourceData = data.all
+    const sourceData = currentRegion === "all" ? data.all : data[currentRegion]
 
-    if (filterType === "all") {
+    if (filter.type === "all") {
       const filtered = sourceData.data
 
       // Calculate financial metrics
@@ -51,10 +51,10 @@ export function FinancialReport({ data }: FinancialReportProps) {
     }
 
     const filtered = sourceData.data.filter((parcel) => {
-      if (filterType === "province") {
-        return parcel.province.toLowerCase().includes(filterValue.toLowerCase())
+      if (filter.type === "province") {
+        return parcel.province.toLowerCase().includes(filter.value.toLowerCase())
       }
-      if (filterType === "month") {
+      if (filter.type === "month") {
         if (!parcel.date) return false
         let parcelMonth: number
         try {
@@ -74,9 +74,9 @@ export function FinancialReport({ data }: FinancialReportProps) {
           const parts = parcel.date.toString().split(" ")[0].split("-")
           parcelMonth = Number.parseInt(parts[1], 10)
         }
-        return parcelMonth === Number.parseInt(filterValue, 10)
+        return parcelMonth === Number.parseInt(filter.value, 10)
       }
-      if (filterType === "year") {
+      if (filter.type === "year") {
         if (!parcel.date) return false
         let parcelYear: number
         try {
@@ -96,7 +96,7 @@ export function FinancialReport({ data }: FinancialReportProps) {
           const parts = parcel.date.toString().split(" ")[0].split("-")
           parcelYear = Number.parseInt(parts[0], 10)
         }
-        return parcelYear === Number.parseInt(filterValue, 10)
+        return parcelYear === Number.parseInt(filter.value, 10)
       }
       return true
     })
@@ -127,7 +127,7 @@ export function FinancialReport({ data }: FinancialReportProps) {
       grossProfit,
       netProfit,
     }
-  }, [data, filterType, filterValue])
+  }, [data, currentRegion, filter])
 
   if (!data) {
     return (
@@ -148,84 +148,108 @@ export function FinancialReport({ data }: FinancialReportProps) {
         <p className="text-muted-foreground">Comprehensive financial analysis and RTS cost impact</p>
       </div>
 
-      <div className="flex items-center gap-2">
-        <label className="text-sm font-semibold text-foreground">Filter:</label>
-        <select
-          value={filterType}
-          onChange={(e) => {
-            setFilterType(e.target.value as any)
-            setFilterValue("")
-          }}
-          className="px-3 py-1.5 text-sm bg-secondary border border-border rounded-md text-foreground"
-        >
-          <option value="all">All</option>
-          <option value="province">Province</option>
-          <option value="month">Month</option>
-          <option value="year">Year</option>
-        </select>
+      {/* Region Tabs */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex gap-2">
+          <Button
+            variant={currentRegion === "all" ? "default" : "outline"}
+            onClick={() => setCurrentRegion("all")}
+            className="font-medium"
+          >
+            All Regions
+          </Button>
+          <Button
+            variant={currentRegion === "luzon" ? "default" : "outline"}
+            onClick={() => setCurrentRegion("luzon")}
+            className="font-medium"
+          >
+            Luzon
+          </Button>
+          <Button
+            variant={currentRegion === "visayas" ? "default" : "outline"}
+            onClick={() => setCurrentRegion("visayas")}
+            className="font-medium"
+          >
+            Visayas
+          </Button>
+          <Button
+            variant={currentRegion === "mindanao" ? "default" : "outline"}
+            onClick={() => setCurrentRegion("mindanao")}
+            className="font-medium"
+          >
+            Mindanao
+          </Button>
+        </div>
 
-        {filterType === "province" && (
-          <Input
-            type="text"
-            placeholder="Enter province name"
-            value={filterValue}
-            onChange={(e) => setFilterValue(e.target.value)}
-            className="w-48 h-9 text-sm"
-          />
-        )}
-
-        {filterType === "month" && (
+        {/* Filter Controls */}
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-semibold text-foreground">Filter:</label>
           <select
-            value={filterValue}
-            onChange={(e) => setFilterValue(e.target.value)}
+            value={filter.type}
+            onChange={(e) => {
+              setFilter({ type: e.target.value as any, value: "" })
+            }}
             className="px-3 py-1.5 text-sm bg-secondary border border-border rounded-md text-foreground"
           >
-            <option value="">Select month</option>
-            {Array.from({ length: 12 }, (_, i) => (
-              <option key={i + 1} value={String(i + 1).padStart(2, "0")}>
-                {new Date(2000, i).toLocaleString("default", { month: "long" })}
-              </option>
-            ))}
+            <option value="all">All</option>
+            <option value="province">Province</option>
+            <option value="month">Month</option>
+            <option value="year">Year</option>
           </select>
-        )}
 
-        {filterType === "year" && (
-          <select
-            value={filterValue}
-            onChange={(e) => setFilterValue(e.target.value)}
-            className="px-3 py-1.5 text-sm bg-secondary border border-border rounded-md text-foreground"
-          >
-            <option value="">Select year</option>
-            {Array.from({ length: new Date().getFullYear() - 1999 }, (_, i) => (
-              <option key={2000 + i} value={String(2000 + i)}>
-                {2000 + i}
-              </option>
-            ))}
-          </select>
-        )}
+          {filter.type === "province" && (
+            <Input
+              type="text"
+              placeholder="Enter province name"
+              value={filter.value}
+              onChange={(e) => setFilter({ ...filter, value: e.target.value })}
+              className="w-48 h-9 text-sm"
+            />
+          )}
 
-        <button
-          onClick={() => {
-            if (filterType !== "all" && !filterValue) {
+          {filter.type === "month" && (
+            <select
+              value={filter.value}
+              onChange={(e) => setFilter({ ...filter, value: e.target.value })}
+              className="px-3 py-1.5 text-sm bg-secondary border border-border rounded-md text-foreground"
+            >
+              <option value="">Select month</option>
+              {Array.from({ length: 12 }, (_, i) => (
+                <option key={i + 1} value={String(i + 1).padStart(2, "0")}>
+                  {new Date(2000, i).toLocaleString("default", { month: "long" })}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {filter.type === "year" && (
+            <select
+              value={filter.value}
+              onChange={(e) => setFilter({ ...filter, value: e.target.value })}
+              className="px-3 py-1.5 text-sm bg-secondary border border-border rounded-md text-foreground"
+            >
+              <option value="">Select year</option>
+              {Array.from({ length: new Date().getFullYear() - 1999 }, (_, i) => (
+                <option key={2000 + i} value={String(2000 + i)}>
+                  {2000 + i}
+                </option>
+              ))}
+            </select>
+          )}
+
+          <Button size="sm" onClick={() => {
+            if (filter.type !== "all" && !filter.value) {
               alert("Please enter or select a value to filter.")
               return
             }
             // Trigger filtering by updating state (already handled by useMemo)
-          }}
-          className="px-4 py-1.5 rounded-md bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
-        >
-          Apply
-        </button>
-
-        <button
-          onClick={() => {
-            setFilterType("all")
-            setFilterValue("")
-          }}
-          className="px-4 py-1.5 rounded-md border border-border text-sm font-semibold hover:bg-secondary/50 transition-colors"
-        >
-          Clear
-        </button>
+          }} className="h-9">
+            Apply
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setFilter({ type: "all", value: "" })} className="h-9 bg-transparent">
+            Clear
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
