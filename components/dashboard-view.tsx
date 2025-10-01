@@ -321,7 +321,7 @@ export function DashboardView({ data, currentRegion, onRegionChange, filter, onF
             <div className="space-y-1 text-sm max-h-32 overflow-y-auto">
               {topProvinces.map(([province, count]) => (
                 <div key={province}>
-                  {province}: <strong>{count}</strong>
+                  {province}: <strong>{count as number}</strong>
                 </div>
               ))}
             </div>
@@ -332,7 +332,7 @@ export function DashboardView({ data, currentRegion, onRegionChange, filter, onF
             <div className="space-y-1 text-sm max-h-32 overflow-y-auto">
               {topRegions.map(([region, count]) => (
                 <div key={region}>
-                  {region}: <strong>{count}</strong>
+                  {region}: <strong>{count as number}</strong>
                 </div>
               ))}
             </div>
@@ -359,7 +359,7 @@ export function DashboardView({ data, currentRegion, onRegionChange, filter, onF
               {topWinningShippers.length > 0 ? (
                 topWinningShippers.map(([shipper, count]) => (
                   <div key={shipper}>
-                    {shipper}: <strong>{count}</strong>
+                    {shipper}: <strong>{count as number}</strong>
                   </div>
                 ))
               ) : (
@@ -374,7 +374,7 @@ export function DashboardView({ data, currentRegion, onRegionChange, filter, onF
               {topRTSShippers.length > 0 ? (
                 topRTSShippers.map(([shipper, count]) => (
                   <div key={shipper}>
-                    {shipper}: <strong>{count}</strong>
+                    {shipper}: <strong>{count as number}</strong>
                   </div>
                 ))
               ) : (
