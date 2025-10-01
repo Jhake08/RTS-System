@@ -50,10 +50,10 @@ export function AnalyticalReport({ data }: AnalyticalReportProps) {
         .sort(([, a], [, b]) => b - a)
         .slice(0, 10)
 
-      // Calculate regional totals
-      const luzonTotal = filtered.filter((p) => p.island === "luzon").length
-      const visayasTotal = filtered.filter((p) => p.island === "visayas").length
-      const mindanaoTotal = filtered.filter((p) => p.island === "mindanao").length
+      // Calculate regional totals from entire data
+      const luzonTotal = data.luzon.total
+      const visayasTotal = data.visayas.total
+      const mindanaoTotal = data.mindanao.total
 
       return {
         filteredData: { luzonTotal, visayasTotal, mindanaoTotal, total: filtered.length },
@@ -142,10 +142,10 @@ export function AnalyticalReport({ data }: AnalyticalReportProps) {
       .sort(([, a], [, b]) => b - a)
       .slice(0, 10)
 
-    // Calculate regional totals
-    const luzonTotal = filtered.filter((p) => p.island === "luzon").length
-    const visayasTotal = filtered.filter((p) => p.island === "visayas").length
-    const mindanaoTotal = filtered.filter((p) => p.island === "mindanao").length
+    // Calculate regional totals from entire data
+    const luzonTotal = data.luzon.total
+    const visayasTotal = data.visayas.total
+    const mindanaoTotal = data.mindanao.total
 
     return {
       filteredData: { luzonTotal, visayasTotal, mindanaoTotal, total: filtered.length },
