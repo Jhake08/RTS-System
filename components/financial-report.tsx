@@ -1,20 +1,105 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { DollarSign, AlertCircle, TrendingUp, TrendingDown } from "lucide-react"
 import type { ProcessedData } from "@/lib/types"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 
 interface FinancialReportProps {
   data: ProcessedData | null
 }
 
 export function FinancialReport({ data }: FinancialReportProps) {
+  const [filterType, setFilterType] = useState<"all" | "province" | "month" | "year">("all")
+  const [filterValue, setFilterValue] = useState("")
+
   const financialData = useMemo(() => {
     if (!data) return null
 
     const sourceData = data.all
 
-    const filtered = sourceData.data
+    if (filterType === "all") {
+      const filtered = sourceData.data
+
+      // Calculate financial metrics
+      const totalCOD = filtered.reduce((sum, parcel) => sum + (parcel.codAmount || 0), 0)
+      const totalServiceCharge = filtered.reduce((sum, parcel) => sum + (parcel.serviceCharge || 0), 0)
+      const totalShippingCost = filtered.reduce((sum, parcel) => sum + (parcel.totalCost || 0), 0)
+      const totalRTSFee = filtered.reduce((sum, parcel) => sum + (parcel.rtsFee || 0), 0)
+
+      // Calculate RTS-specific costs
+      const rtsStatuses = ["CANCELLED", "PROBLEMATIC", "RETURNED"]
+      const rtsParcels = filtered.filter((p) => rtsStatuses.includes(p.normalizedStatus))
+      const rtsShippingCost = rtsParcels.reduce((sum, parcel) => sum + (parcel.totalCost || 0), 0)
+      const rtsFeeLost = rtsParcels.reduce((sum, parcel) => sum + (parcel.rtsFee || 0), 0)
+
+      const grossProfit = totalCOD - totalShippingCost
+      const netProfit = grossProfit - rtsShippingCost - rtsFeeLost
+
+      return {
+        totalCOD,
+        totalServiceCharge,
+        totalShippingCost,
+        totalRTSFee,
+        rtsParcelsCount: rtsParcels.length,
+        rtsShippingCost,
+        rtsFeeLost,
+        grossProfit,
+        netProfit,
+      }
+    }
+
+    const filtered = sourceData.data.filter((parcel) => {
+      if (filterType === "province") {
+        return parcel.province.toLowerCase().includes(filterValue.toLowerCase())
+      }
+      if (filterType === "month") {
+        if (!parcel.date) return false
+        let parcelMonth: number
+        try {
+          let d: Date
+          if (typeof parcel.date === "number") {
+            d = new Date(Date.UTC(1899, 11, 30) + parcel.date * 86400000)
+          } else {
+            d = new Date(parcel.date.toString().trim())
+          }
+          if (isNaN(d.getTime())) {
+            const parts = parcel.date.toString().split(" ")[0].split("-")
+            parcelMonth = Number.parseInt(parts[1], 10)
+          } else {
+            parcelMonth = d.getMonth() + 1
+          }
+        } catch (e) {
+          const parts = parcel.date.toString().split(" ")[0].split("-")
+          parcelMonth = Number.parseInt(parts[1], 10)
+        }
+        return parcelMonth === Number.parseInt(filterValue, 10)
+      }
+      if (filterType === "year") {
+        if (!parcel.date) return false
+        let parcelYear: number
+        try {
+          let d: Date
+          if (typeof parcel.date === "number") {
+            d = new Date(Date.UTC(1899, 11, 30) + parcel.date * 86400000)
+          } else {
+            d = new Date(parcel.date.toString().trim())
+          }
+          if (isNaN(d.getTime())) {
+            const parts = parcel.date.toString().split(" ")[0].split("-")
+            parcelYear = Number.parseInt(parts[0], 10)
+          } else {
+            parcelYear = d.getFullYear()
+          }
+        } catch (e) {
+          const parts = parcel.date.toString().split(" ")[0].split("-")
+          parcelYear = Number.parseInt(parts[0], 10)
+        }
+        return parcelYear === Number.parseInt(filterValue, 10)
+      }
+      return true
+    })
 
     // Calculate financial metrics
     const totalCOD = filtered.reduce((sum, parcel) => sum + (parcel.codAmount || 0), 0)
@@ -42,7 +127,7 @@ export function FinancialReport({ data }: FinancialReportProps) {
       grossProfit,
       netProfit,
     }
-  }, [data])
+  }, [data, filterType, filterValue])
 
   if (!data) {
     return (
@@ -61,6 +146,86 @@ export function FinancialReport({ data }: FinancialReportProps) {
       <div>
         <h1 className="text-3xl font-bold text-foreground mb-2">FINANCIAL IMPACT REPORT</h1>
         <p className="text-muted-foreground">Comprehensive financial analysis and RTS cost impact</p>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <label className="text-sm font-semibold text-foreground">Filter:</label>
+        <select
+          value={filterType}
+          onChange={(e) => {
+            setFilterType(e.target.value as any)
+            setFilterValue("")
+          }}
+          className="px-3 py-1.5 text-sm bg-secondary border border-border rounded-md text-foreground"
+        >
+          <option value="all">All</option>
+          <option value="province">Province</option>
+          <option value="month">Month</option>
+          <option value="year">Year</option>
+        </select>
+
+        {filterType === "province" && (
+          <Input
+            type="text"
+            placeholder="Enter province name"
+            value={filterValue}
+            onChange={(e) => setFilterValue(e.target.value)}
+            className="w-48 h-9 text-sm"
+          />
+        )}
+
+        {filterType === "month" && (
+          <select
+            value={filterValue}
+            onChange={(e) => setFilterValue(e.target.value)}
+            className="px-3 py-1.5 text-sm bg-secondary border border-border rounded-md text-foreground"
+          >
+            <option value="">Select month</option>
+            {Array.from({ length: 12 }, (_, i) => (
+              <option key={i + 1} value={String(i + 1).padStart(2, "0")}>
+                {new Date(2000, i).toLocaleString("default", { month: "long" })}
+              </option>
+            ))}
+          </select>
+        )}
+
+        {filterType === "year" && (
+          <select
+            value={filterValue}
+            onChange={(e) => setFilterValue(e.target.value)}
+            className="px-3 py-1.5 text-sm bg-secondary border border-border rounded-md text-foreground"
+          >
+            <option value="">Select year</option>
+            {Array.from({ length: new Date().getFullYear() - 1999 }, (_, i) => (
+              <option key={2000 + i} value={String(2000 + i)}>
+                {2000 + i}
+              </option>
+            ))}
+          </select>
+        )}
+
+        <button
+          onClick={() => {
+            if (filterType !== "all" && !filterValue) {
+              alert("Please enter or select a value to filter.")
+              return
+            }
+            // Trigger filtering by updating state (already handled by useMemo)
+          }}
+          className="px-4 py-1.5 rounded-md bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+        >
+          Apply
+        </button>
+
+        <button
+          onClick={() => {
+            setFilterType("all")
+            setFilterValue("")
+          }}
+          className="px-4 py-1.5 rounded-md border border-border text-sm font-semibold hover:bg-secondary/50 transition-colors"
+        >
+          Clear
+        </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

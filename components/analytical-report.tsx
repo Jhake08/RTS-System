@@ -1,20 +1,118 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { PieChart, MapPin, PackageX } from "lucide-react"
 import type { ProcessedData } from "@/lib/types"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 
 interface AnalyticalReportProps {
   data: ProcessedData | null
 }
 
 export function AnalyticalReport({ data }: AnalyticalReportProps) {
+  const [filterType, setFilterType] = useState<"all" | "province" | "month" | "year">("all")
+  const [filterValue, setFilterValue] = useState("")
+
   const { filteredData, topProvinces, topShippers, topRTSDestinations } = useMemo(() => {
     if (!data) return { filteredData: null, topProvinces: [], topShippers: [], topRTSDestinations: [] }
 
     const sourceData = data.all
 
-    const filtered = sourceData.data
+    if (filterType === "all") {
+      const filtered = sourceData.data
+
+      // Calculate provinces
+      const provinces: { [key: string]: number } = {}
+      const shippers: { [key: string]: number } = {}
+      filtered.forEach((parcel) => {
+        provinces[parcel.province] = (provinces[parcel.province] || 0) + 1
+        shippers[parcel.shipper] = (shippers[parcel.shipper] || 0) + 1
+      })
+
+      const rtsStatuses = ["CANCELLED", "PROBLEMATIC", "RETURNED"]
+      const rtsDestinations: { [key: string]: number } = {}
+      filtered
+        .filter((p) => rtsStatuses.includes(p.normalizedStatus))
+        .forEach((parcel) => {
+          rtsDestinations[parcel.province] = (rtsDestinations[parcel.province] || 0) + 1
+        })
+
+      const topProvinces = Object.entries(provinces)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 10)
+
+      const topShippers = Object.entries(shippers)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 10)
+
+      const topRTSDestinations = Object.entries(rtsDestinations)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 10)
+
+      // Calculate regional totals
+      const luzonTotal = filtered.filter((p) => p.island === "luzon").length
+      const visayasTotal = filtered.filter((p) => p.island === "visayas").length
+      const mindanaoTotal = filtered.filter((p) => p.island === "mindanao").length
+
+      return {
+        filteredData: { luzonTotal, visayasTotal, mindanaoTotal, total: filtered.length },
+        topProvinces,
+        topShippers,
+        topRTSDestinations,
+      }
+    }
+
+    const filtered = sourceData.data.filter((parcel) => {
+      if (filterType === "province") {
+        return parcel.province.toLowerCase().includes(filterValue.toLowerCase())
+      }
+      if (filterType === "month") {
+        if (!parcel.date) return false
+        let parcelMonth: number
+        try {
+          let d: Date
+          if (typeof parcel.date === "number") {
+            d = new Date(Date.UTC(1899, 11, 30) + parcel.date * 86400000)
+          } else {
+            d = new Date(parcel.date.toString().trim())
+          }
+          if (isNaN(d.getTime())) {
+            const parts = parcel.date.toString().split(" ")[0].split("-")
+            parcelMonth = Number.parseInt(parts[1], 10)
+          } else {
+            parcelMonth = d.getMonth() + 1
+          }
+        } catch (e) {
+          const parts = parcel.date.toString().split(" ")[0].split("-")
+          parcelMonth = Number.parseInt(parts[1], 10)
+        }
+        return parcelMonth === Number.parseInt(filterValue, 10)
+      }
+      if (filterType === "year") {
+        if (!parcel.date) return false
+        let parcelYear: number
+        try {
+          let d: Date
+          if (typeof parcel.date === "number") {
+            d = new Date(Date.UTC(1899, 11, 30) + parcel.date * 86400000)
+          } else {
+            d = new Date(parcel.date.toString().trim())
+          }
+          if (isNaN(d.getTime())) {
+            const parts = parcel.date.toString().split(" ")[0].split("-")
+            parcelYear = Number.parseInt(parts[0], 10)
+          } else {
+            parcelYear = d.getFullYear()
+          }
+        } catch (e) {
+          const parts = parcel.date.toString().split(" ")[0].split("-")
+          parcelYear = Number.parseInt(parts[0], 10)
+        }
+        return parcelYear === Number.parseInt(filterValue, 10)
+      }
+      return true
+    })
 
     // Calculate provinces
     const provinces: { [key: string]: number } = {}
@@ -55,7 +153,7 @@ export function AnalyticalReport({ data }: AnalyticalReportProps) {
       topShippers,
       topRTSDestinations,
     }
-  }, [data])
+  }, [data, filterType, filterValue])
 
   if (!data) {
     return (
@@ -74,6 +172,86 @@ export function AnalyticalReport({ data }: AnalyticalReportProps) {
       <div>
         <h1 className="text-3xl font-bold text-foreground mb-2">ANALYTICAL REPORT</h1>
         <p className="text-muted-foreground">Deep insights into regional distribution and shipper performance</p>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <label className="text-sm font-semibold text-foreground">Filter:</label>
+        <select
+          value={filterType}
+          onChange={(e) => {
+            setFilterType(e.target.value as any)
+            setFilterValue("")
+          }}
+          className="px-3 py-1.5 text-sm bg-secondary border border-border rounded-md text-foreground"
+        >
+          <option value="all">All</option>
+          <option value="province">Province</option>
+          <option value="month">Month</option>
+          <option value="year">Year</option>
+        </select>
+
+        {filterType === "province" && (
+          <Input
+            type="text"
+            placeholder="Enter province name"
+            value={filterValue}
+            onChange={(e) => setFilterValue(e.target.value)}
+            className="w-48 h-9 text-sm"
+          />
+        )}
+
+        {filterType === "month" && (
+          <select
+            value={filterValue}
+            onChange={(e) => setFilterValue(e.target.value)}
+            className="px-3 py-1.5 text-sm bg-secondary border border-border rounded-md text-foreground"
+          >
+            <option value="">Select month</option>
+            {Array.from({ length: 12 }, (_, i) => (
+              <option key={i + 1} value={String(i + 1).padStart(2, "0")}>
+                {new Date(2000, i).toLocaleString("default", { month: "long" })}
+              </option>
+            ))}
+          </select>
+        )}
+
+        {filterType === "year" && (
+          <select
+            value={filterValue}
+            onChange={(e) => setFilterValue(e.target.value)}
+            className="px-3 py-1.5 text-sm bg-secondary border border-border rounded-md text-foreground"
+          >
+            <option value="">Select year</option>
+            {Array.from({ length: new Date().getFullYear() - 1999 }, (_, i) => (
+              <option key={2000 + i} value={String(2000 + i)}>
+                {2000 + i}
+              </option>
+            ))}
+          </select>
+        )}
+
+        <button
+          onClick={() => {
+            if (filterType !== "all" && !filterValue) {
+              alert("Please enter or select a value to filter.")
+              return
+            }
+            // Trigger filtering by updating state (already handled by useMemo)
+          }}
+          className="px-4 py-1.5 rounded-md bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+        >
+          Apply
+        </button>
+
+        <button
+          onClick={() => {
+            setFilterType("all")
+            setFilterValue("")
+          }}
+          className="px-4 py-1.5 rounded-md border border-border text-sm font-semibold hover:bg-secondary/50 transition-colors"
+        >
+          Clear
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
