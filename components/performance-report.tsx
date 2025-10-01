@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { TrendingUp, Package, CheckCircle, XCircle } from "lucide-react"
+import { TrendingUp, Package, CheckCircle, XCircle, DollarSign, AlertCircle, TrendingDown } from "lucide-react"
 import type { ProcessedData } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -31,10 +31,27 @@ export function PerformanceReport({ data }: PerformanceReportProps) {
         stats[parcel.normalizedStatus].count++
       })
 
+      // Calculate financial metrics
+      const totalCOD = filtered.reduce((sum, parcel) => sum + (parcel.codAmount || 0), 0)
+      const totalShippingCost = filtered.reduce((sum, parcel) => sum + (parcel.totalCost || 0), 0)
+      const rtsStatuses = ["CANCELLED", "PROBLEMATIC", "RETURNED"]
+      const rtsParcels = filtered.filter((p) => rtsStatuses.includes(p.normalizedStatus))
+      const rtsShippingCost = rtsParcels.reduce((sum, parcel) => sum + (parcel.totalCost || 0), 0)
+      const rtsFeeLost = rtsParcels.reduce((sum, parcel) => sum + (parcel.rtsFee || 0), 0)
+      const grossProfit = totalCOD - totalShippingCost
+      const netProfit = grossProfit - rtsShippingCost - rtsFeeLost
+
       return {
         data: filtered,
         stats,
         total: filtered.length,
+        totalCOD,
+        totalShippingCost,
+        rtsShippingCost,
+        grossProfit,
+        netProfit,
+        rtsParcelsCount: rtsParcels.length,
+        rtsFeeLost,
       }
     }
 
@@ -98,10 +115,27 @@ export function PerformanceReport({ data }: PerformanceReportProps) {
       stats[parcel.normalizedStatus].count++
     })
 
+    // Calculate financial metrics
+    const totalCOD = filtered.reduce((sum, parcel) => sum + (parcel.codAmount || 0), 0)
+    const totalShippingCost = filtered.reduce((sum, parcel) => sum + (parcel.totalCost || 0), 0)
+    const rtsStatuses = ["CANCELLED", "PROBLEMATIC", "RETURNED"]
+    const rtsParcels = filtered.filter((p) => rtsStatuses.includes(p.normalizedStatus))
+    const rtsShippingCost = rtsParcels.reduce((sum, parcel) => sum + (parcel.totalCost || 0), 0)
+    const rtsFeeLost = rtsParcels.reduce((sum, parcel) => sum + (parcel.rtsFee || 0), 0)
+    const grossProfit = totalCOD - totalShippingCost
+    const netProfit = grossProfit - rtsShippingCost - rtsFeeLost
+
     return {
       data: filtered,
       stats,
       total: filtered.length,
+      totalCOD,
+      totalShippingCost,
+      rtsShippingCost,
+      grossProfit,
+      netProfit,
+      rtsParcelsCount: rtsParcels.length,
+      rtsFeeLost,
     }
   }, [data, filterType, filterValue])
 
